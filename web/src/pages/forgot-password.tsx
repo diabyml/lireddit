@@ -24,7 +24,7 @@ const ForgotPassword: React.FC = () => {
           {completed ? (
             <Box>
               <Text>
-                if an account with that email exists, we sent you an email
+                If an account with that email exists, we sent you an email.
               </Text>
             </Box>
           ) : (
