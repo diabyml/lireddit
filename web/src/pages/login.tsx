@@ -4,7 +4,7 @@ import Wrapper from "../components/layout/wrapper";
 import InputField from "../components/form/input-field";
 import { Box, Button, Heading, Stack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import NextLink from 'next/link';
+import NextLink from "next/link";
 
 import { useLoginMutation } from "../generated/graphql";
 import { toErrorMap } from "../utils/toErrorMap";
@@ -14,9 +14,9 @@ import { createUrqlClient } from "../utils/createUrqlClient";
 interface Props {}
 
 const Login: React.FC<Props> = () => {
-
   const router = useRouter();
   const [, login] = useLoginMutation();
+  // console.log(router);
   return (
     <Box
       h={"100vh"}
@@ -37,7 +37,11 @@ const Login: React.FC<Props> = () => {
                 setErrors(toErrorMap(response.data.login.errors));
               } else if (response.data?.login.user) {
                 // worked
-                router.push("/");
+                if(typeof router.query.next === 'string') {
+                  router.push(router.query.next)
+                }else {
+                  router.push("/");
+                }
               }
             }}
           >
@@ -58,7 +62,9 @@ const Login: React.FC<Props> = () => {
                     // onChange={handleChange}
                   />
                   <Box>
-                    <NextLink href={"/forgot-password"} >Forgot password?</NextLink>
+                    <NextLink href={"/forgot-password"}>
+                      Forgot password?
+                    </NextLink>
                   </Box>
                 </Stack>
                 <Box mt={8}>

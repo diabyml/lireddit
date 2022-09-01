@@ -26,6 +26,7 @@ const sendEmail_1 = require("../utils/sendEmail");
 const uuid_1 = require("uuid");
 const constants_2 = require("../constants");
 const validatePassword_1 = __importDefault(require("../utils/validatePassword"));
+const typeorm_1 = require("typeorm");
 let FieldError = class FieldError {
 };
 __decorate([
@@ -53,8 +54,8 @@ UserResponse = __decorate([
     (0, type_graphql_1.ObjectType)()
 ], UserResponse);
 let UserResolver = class UserResolver {
-    async forgotPassword(email, { em, redis }) {
-        const user = await em.findOne(User_1.User, { email });
+    async forgotPassword(email, { redis }) {
+        const user = await User_1.User.findOne({ where: { email } });
         if (!user) {
             return true;
         }
@@ -70,7 +71,7 @@ let UserResolver = class UserResolver {
         await (0, sendEmail_1.sendEmail)(email, htmlContent);
         return true;
     }
-    async changePassword(token, newPassword, { req, redis, em }) {
+    async changePassword(token, newPassword, { req, redis }) {
         if (!(0, validatePassword_1.default)(newPassword)) {
             return {
                 errors: [
@@ -82,7 +83,7 @@ let UserResolver = class UserResolver {
             };
         }
         const key = constants_2.FORGET_PASSWORD_PREFIX + token;
-        const userId = await redis.get(key);
+        let userId = await redis.get(key);
         if (!userId) {
             return {
                 errors: [
@@ -93,7 +94,8 @@ let UserResolver = class UserResolver {
                 ],
             };
         }
-        const user = await em.findOne(User_1.User, { id: parseInt(userId) });
+        const userIdNum = parseInt(userId);
+        const user = await User_1.User.findOne({ where: { id: userIdNum } });
         if (!user) {
             return {
                 errors: [
@@ -105,20 +107,19 @@ let UserResolver = class UserResolver {
             };
         }
         const hashedPassword = await argon2_1.default.hash(newPassword);
-        user.password = hashedPassword;
-        await em.persistAndFlush(user);
+        await User_1.User.update({ id: userIdNum }, { password: hashedPassword });
         await redis.del(key);
         req.session.userId = user.id;
         return { user };
     }
-    async me({ req, em }) {
+    async me({ req }) {
         const id = req.session.userId;
         if (id) {
-            return await em.findOne(User_1.User, { id });
+            return await User_1.User.findOne({ where: { id } });
         }
         return null;
     }
-    async register(options, { req, em }) {
+    async register(options, { req }) {
         const errors = (0, validateRegister_1.validateRegister)(options);
         if (errors) {
             return {
@@ -126,16 +127,23 @@ let UserResolver = class UserResolver {
             };
         }
         const hashedPassword = await argon2_1.default.hash(options.password);
-        const user = em.create(User_1.User, {
-            username: options.username,
-            password: hashedPassword,
-            email: options.email,
-        });
+        let user;
         try {
-            await em.persistAndFlush(user);
+            const result = await (0, typeorm_1.getConnection)()
+                .createQueryBuilder()
+                .insert()
+                .into(User_1.User)
+                .values({
+                username: options.username,
+                password: hashedPassword,
+                email: options.email,
+            })
+                .returning("*")
+                .execute();
+            user = result.raw[0];
         }
         catch (error) {
-            console.log(error);
+            console.log("err:", error);
             if (error.code === "23505" || error.detail.includes("already exists")) {
                 return {
                     errors: [
@@ -150,10 +158,10 @@ let UserResolver = class UserResolver {
         req.session.userId = user.id;
         return { user };
     }
-    async login(usernameOrEmail, password, { req, em }) {
-        const user = await em.findOne(User_1.User, usernameOrEmail.includes("@")
-            ? { email: usernameOrEmail }
-            : { username: usernameOrEmail });
+    async login(usernameOrEmail, password, { req }) {
+        const user = await User_1.User.findOne(usernameOrEmail.includes("@")
+            ? { where: { email: usernameOrEmail } }
+            : { where: { username: usernameOrEmail } });
         if (!user) {
             return {
                 errors: [

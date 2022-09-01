@@ -15,76 +15,130 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PostResolver = void 0;
 const type_graphql_1 = require("type-graphql");
 const Post_1 = require("../entities/Post");
+const isAuth_1 = require("../middleware/isAuth");
+const typeorm_1 = require("typeorm");
+let PostInput = class PostInput {
+};
+__decorate([
+    (0, type_graphql_1.Field)(),
+    __metadata("design:type", String)
+], PostInput.prototype, "title", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(),
+    __metadata("design:type", String)
+], PostInput.prototype, "text", void 0);
+PostInput = __decorate([
+    (0, type_graphql_1.InputType)()
+], PostInput);
+let PaginatedPosts = class PaginatedPosts {
+};
+__decorate([
+    (0, type_graphql_1.Field)(() => [Post_1.Post]),
+    __metadata("design:type", Array)
+], PaginatedPosts.prototype, "posts", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(),
+    __metadata("design:type", Boolean)
+], PaginatedPosts.prototype, "hasMore", void 0);
+PaginatedPosts = __decorate([
+    (0, type_graphql_1.ObjectType)()
+], PaginatedPosts);
 let PostResolver = class PostResolver {
-    async posts({ em }) {
-        return em.find(Post_1.Post, {});
+    textSnippet(root) {
+        return root.text.slice(0, 50);
     }
-    post(id, { em }) {
-        return em.findOne(Post_1.Post, { id });
+    async posts(limit, cursor) {
+        const realLimit = Math.min(50, limit);
+        const reaLimitPlusOne = realLimit + 1;
+        const replacements = [reaLimitPlusOne];
+        if (cursor) {
+            replacements.push(new Date(parseInt(cursor)));
+        }
+        const posts = await (0, typeorm_1.getConnection)().query(`
+    select p.*
+    from post p
+    ${cursor ? `where p."createdAt" < $2` : ""}
+    order by p."createdAt" DESC
+    limit $1
+    `, replacements);
+        return {
+            posts: posts.slice(0, realLimit),
+            hasMore: posts.length === reaLimitPlusOne,
+        };
     }
-    async createPost(title, { em }) {
-        const post = em.create(Post_1.Post, { title });
-        await em.persistAndFlush(post);
-        return post;
+    post(id) {
+        return Post_1.Post.findOne({ where: { id } });
     }
-    async updatePost(id, title, { em }) {
-        const post = await em.findOne(Post_1.Post, { id });
+    async createPost(input, { req }) {
+        const post = new Post_1.Post();
+        post.title = input.title;
+        post.text = input.text;
+        post.creatorId = req.session.userId;
+        return post.save();
+    }
+    async updatePost(id, title) {
+        const post = await Post_1.Post.findOne({ where: { id } });
         if (!post) {
             return null;
         }
         if (typeof title !== "undefined") {
-            post.title = title;
-            await em.persistAndFlush(post);
+            await Post_1.Post.update({ id }, { title });
         }
         return post;
     }
-    async deletePost(id, { em }) {
-        await em.nativeDelete(Post_1.Post, { id });
+    async deletePost(id) {
+        await Post_1.Post.delete(id);
         return true;
     }
 };
 __decorate([
-    (0, type_graphql_1.Query)(() => [Post_1.Post]),
-    __param(0, (0, type_graphql_1.Ctx)()),
+    (0, type_graphql_1.FieldResolver)(() => String),
+    __param(0, (0, type_graphql_1.Root)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Post_1.Post]),
+    __metadata("design:returntype", String)
+], PostResolver.prototype, "textSnippet", null);
+__decorate([
+    (0, type_graphql_1.Query)(() => PaginatedPosts),
+    __param(0, (0, type_graphql_1.Arg)("limit", () => type_graphql_1.Int)),
+    __param(1, (0, type_graphql_1.Arg)("cursor", () => String, { nullable: true })),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, String]),
     __metadata("design:returntype", Promise)
 ], PostResolver.prototype, "posts", null);
 __decorate([
     (0, type_graphql_1.Query)(() => Post_1.Post, { nullable: true }),
-    __param(0, (0, type_graphql_1.Arg)("id", () => type_graphql_1.Int)),
-    __param(1, (0, type_graphql_1.Ctx)()),
+    __param(0, (0, type_graphql_1.Arg)("id")),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", Promise)
 ], PostResolver.prototype, "post", null);
 __decorate([
     (0, type_graphql_1.Mutation)(() => Post_1.Post),
-    __param(0, (0, type_graphql_1.Arg)("title", () => String)),
+    (0, type_graphql_1.UseMiddleware)(isAuth_1.isAuth),
+    __param(0, (0, type_graphql_1.Arg)("input")),
     __param(1, (0, type_graphql_1.Ctx)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [PostInput, Object]),
     __metadata("design:returntype", Promise)
 ], PostResolver.prototype, "createPost", null);
 __decorate([
     (0, type_graphql_1.Mutation)(() => Post_1.Post, { nullable: true }),
     __param(0, (0, type_graphql_1.Arg)("id", () => type_graphql_1.Int)),
     __param(1, (0, type_graphql_1.Arg)("title", () => String, { nullable: true })),
-    __param(2, (0, type_graphql_1.Ctx)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, String, Object]),
+    __metadata("design:paramtypes", [Number, String]),
     __metadata("design:returntype", Promise)
 ], PostResolver.prototype, "updatePost", null);
 __decorate([
     (0, type_graphql_1.Mutation)(() => Boolean),
     __param(0, (0, type_graphql_1.Arg)("id", () => type_graphql_1.Int)),
-    __param(1, (0, type_graphql_1.Ctx)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", Promise)
 ], PostResolver.prototype, "deletePost", null);
 PostResolver = __decorate([
-    (0, type_graphql_1.Resolver)()
+    (0, type_graphql_1.Resolver)(Post_1.Post)
 ], PostResolver);
 exports.PostResolver = PostResolver;
 //# sourceMappingURL=post.js.map

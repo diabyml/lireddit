@@ -1,16 +1,15 @@
-import { MikroORM } from "@mikro-orm/core";
 import { ApolloServer } from "apollo-server-express";
 import cors from "cors";
 import "dotenv/config";
 import express from "express";
 import "reflect-metadata";
 import { buildSchema } from "type-graphql";
+import { createConnection } from "typeorm";
 
 // for session, go back to odl playground
 import { ApolloServerPluginLandingPageGraphQLPlayground } from "apollo-server-core";
 
 import { COOKIE_NAME, __prod__ } from "./constants";
-import config from "./mikro-orm.config";
 import { PostResolver } from "./resolvers/post";
 import { UserResolver } from "./resolvers/user.resolver";
 
@@ -36,6 +35,9 @@ const redisClient = new Redis();
 // for preventing the issue below
 // Property 'userId' does not exist on type 'Session & Partial<SessionData>'
 import "express-session";
+import { Post } from "./entities/Post";
+import { User } from "./entities/User";
+import path from "path";
 
 declare module "express-session" {
   interface SessionData {
@@ -43,10 +45,22 @@ declare module "express-session" {
   }
 }
 
+// rerun again
+
 const main = async () => {
-  const orm = await MikroORM.init(config);
-  // await orm.em.nativeDelete(User,{});
-  await orm.getMigrator().up();
+  // configure typeorm connection
+  const conn = await createConnection({
+    type: "postgres",
+    database: "lireddit2",
+    username: "postgres",
+    password: "Webdevwithdiaby@2021",
+    logging: true,
+    synchronize: true, // prefered in development, that automatically runs the migartions
+    entities: [User, Post],
+    migrations: [path.join(__dirname, "./migrations/*")],
+  });
+
+  conn.runMigrations();
 
   const app = express();
   app.use(
@@ -83,7 +97,6 @@ const main = async () => {
       validate: false,
     }),
     context: ({ req, res }): MyContext => ({
-      em: orm.em,
       req,
       res,
       redis: redisClient,
@@ -100,7 +113,6 @@ const main = async () => {
     app,
     cors: false,
   });
-
 
   app.listen(4000, () => {
     console.log("Listening on port 4000");

@@ -1,0 +1,2 @@
+Generate typeor migration: typeorm migration:create ./path-to-migrations-dir/PostRefactoring // for my fake data
+for fake data i m using: https://www.mockaroo.com/

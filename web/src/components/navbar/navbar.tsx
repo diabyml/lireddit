@@ -56,7 +56,15 @@ const NavBar: React.FC<Props> = () => {
     );
   }
   return (
-    <Box px={4} bg={useColorModeValue("tan", "gray.800")} color="white">
+    <Box
+      px={4}
+      bg={useColorModeValue("tan", "gray.800")}
+      color="white"
+      w={"100%"}
+      pos={"fixed"}
+      top={0}
+      right={0}
+    >
       <Flex h={16} alignItems="center" justifyContent="space-between" mx="auto">
         <Box>Lireddit</Box>
         {body}
